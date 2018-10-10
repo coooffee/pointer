@@ -154,7 +154,7 @@ def get_num(img):               #获取精确的数字
         if 5<w<15 and 10<h<20:                                                         #限制每个数字的高和宽
             num_img = img_cutting2(img,x,y,w,h)
 
-            cv2.imshow('num',num_img)                                                  #将每个数字切割出来并保存 
+            cv2.imshow('num',num_img)                                                  #将每个数字切割出来并保存 a 
             # cv2.imwrite('precisenum_%d_%d.jpg' % (partnum, precisenum),num_img)        #partnum是第几个图片中的数字，precisenum是这张图片中第几个数字
             # precisenum += 1
 
