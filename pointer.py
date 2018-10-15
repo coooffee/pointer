@@ -70,6 +70,30 @@ def img_cutting2(img,x,y,w,h):    #图像进一步切割 将数字精确切割�
 
     return cut_img
 
+def cal_per_angle_represent(dic):            #{80: 105.65, 120: 139.0, 20: 53.409375, 100: 124.0}
+    
+    dev_keys = 0
+    dev_values = 0
+    keys = []
+    values = []
+    per_angle = []
+
+    for k,v in dic.items():
+        keys.append(k)                       #[80, 120, 20, 100]
+        values.append(v)                     #[105.65, 139.0, 53.409375, 124.0]
+
+    for i in range(len(keys)-1):
+        dev_keys = abs(keys[i+1] - keys[i])
+        dev_values = abs(values[i+1] - values[i])
+        per_angle.append(dev_keys/dev_values)
+
+    per_angle_rep = round(np.mean(per_angle),2)
+
+    return keys,values,per_angle_rep
+    
+
+                
+
 def make_templates(num):
 
     path = 'template_%d.jpg' % num
@@ -106,15 +130,13 @@ def num_identification(input_num):
     if identifi_result[predic_num]<5000:
         return int(predic_num)
 
-    else:
-        print('this is not a number')
+    # else:
+    #     print('this is not a number')
 
-
-
-    
 
 
 def rotate_img(src,center_x,center_y,degree):     #旋转图像
+
     (height,width)=src.shape[:2]
     center=(center_x,center_y)     
     angle = degree *np.pi/ 180
@@ -129,14 +151,16 @@ def rotate_img(src,center_x,center_y,degree):     #旋转图像
 
 def get_num(img):               #获取精确的数字
     
+
     global precisenum
     precisenum = 0
-
     finalnum = 0
     scalenum = 0
     i = 0
-
     num_img=0
+    numbers =[20, 40, 60, 80, 100, 120, 140]
+
+
 
     height,width = img.shape[:2]
     gray_num = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
@@ -154,21 +178,24 @@ def get_num(img):               #获取精确的数字
         if 5<w<15 and 10<h<20:                                                         #限制每个数字的高和宽
             num_img = img_cutting2(img,x,y,w,h)
 
-            cv2.imshow('num',num_img)                                                  #将每个数字切割出来并保存 a 
-            # cv2.imwrite('precisenum_%d_%d.jpg' % (partnum, precisenum),num_img)        #partnum是第几个图片中的数字，precisenum是这张图片中第几个数字
+            cv2.imshow('num',num_img)                                                  #将每个数字切割出来并保存
+            # cv2.imwrite('precisenum_%d_%d.jpg' % (partnum, precisenum),num_img)      #partnum是第几个图片中的数字，precisenum是这张图片中第几个数字
             # precisenum += 1
 
-            scalenum = num_identification(num_img)
-            
+            scalenum = num_identification(num_img)                                     
+
+            # if scalenum in number_dic:
+            #     number_dic[scalenum].append(x)
+            # else:
+            #     number_dic[scalenum] = x
+
             finalnum += scalenum*(10**i)
             i += 1
+            # cv2.waitKey(0)
+        
+    if finalnum in numbers:
+        return finalnum
 
-            cv2.waitKey(0)
-
-    # print('finalnum is %d' % finalnum)
-
-    
-    return finalnum
             
 
 
@@ -178,7 +205,7 @@ def pre_process(img):       #标注出表盘，圆心，刻度，指针
     global picnum
     partnum = 0
     picnum = 0
-    per = []
+    num_angle_dic = {}
 
     gray_img = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
     gauss_img = cv2.GaussianBlur(gray_img, (5, 5),3)  
@@ -216,7 +243,7 @@ def pre_process(img):       #标注出表盘，圆心，刻度，指针
                         gray_img = cv2.line(gray_img,(x1,y1),(x2,y2),(0,0,255),2)        #在灰度图上画刻度线
                         x_f,y_f = farther_p(x1,y1,x2,y2,rx,ry)                           #刻度远点
                         x_c,y_c = close_p(x1,y1,x2,y2,rx,ry)                             #刻度近点
-                        scale_angle = cal_theta(x_f,y_f,rx,ry)                           #计算刻度的角度
+                        scale_angle = round(cal_theta(x_f,y_f,rx,ry), 1)                           #计算刻度的角度,1 wei xiao shu
 
                         rot_i_img = rotate_img(img, x_c, y_c, scale_angle-90)            #将图像按照刻度角度旋转，以便于切图
                         cut_img = img_cutting(rot_i_img, x_c, y_c)                       #将数字区域初步切出来
@@ -225,10 +252,21 @@ def pre_process(img):       #标注出表盘，圆心，刻度，指针
                         # cv2.imwrite('part_%d.jpg' % partnum,cut_img_rot)                 #保存第一次切出来的数字
                         # partnum += 1
 
-                        # cv2.imshow('cut_num',cut_img_rot)
+                        cv2.imshow('cut_num',cut_img_rot)
                         try:
                             number = get_num(cut_img_rot)                   #输出切出的数字图像和最后的数字（多位数）
 
+                            if number is not None:
+                                
+                                if number in num_angle_dic:
+                                    num_angle_dic[number] = (num_angle_dic[number]+scale_angle)/2
+                                else:
+                                    num_angle_dic[number] = scale_angle
+
+                            # print('number is : %d' % number)
+                            # print('scale angle is: %f' % scale_angle)
+
+                            # cv2.waitKey(0)
                         except:
                             continue
 
@@ -236,11 +274,7 @@ def pre_process(img):       #标注出表盘，圆心，刻度，指针
                         # per_angle_represent = round(number/scale_angle, 2)
                         # per.append(per_angle_represent)
 
-                        print('number is : %d' % number)
-                        print('scale angle is: %f' % scale_angle)
-                        # print('per_angle_represent:')
-                        # print(per)
-                        cv2.waitKey(0)
+                        
                         
 
 
@@ -248,12 +282,19 @@ def pre_process(img):       #标注出表盘，圆心，刻度，指针
 
                         gray_img = cv2.line(gray_img,(x1,y1),(x2,y2),(255,0,0),2)
                         x, y =farther_p(x1,y1,x2,y2,rx,ry)
-                        pointer_angle = cal_theta(x,y,rx,ry)
-                        print('pointer angle is: %f' % pointer_angle)
-                        cv2.waitKey(0)
-                
-            
+                        pointer_angle = round(cal_theta(x,y,rx,ry), 1) 
 
+                        print('pointer angle is: %f' % pointer_angle)
+
+                        # cv2.waitKey(0)
+                
+
+        # print(num_angle_dic)
+        keys,values,per_angle_rep = cal_per_angle_represent(num_angle_dic)
+
+        final_val = per_angle_rep*(pointer_angle-min(values))+min(keys)                        #ffffffffffffffffffffffinal result base on min
+        # final_val = max(keys)-per_angle_rep*(max(values) - pointer_angle)                        #ffffffffffffffffffffffinal result base on max
+        print(final_val)
 
         img_withcircle = cv2.circle(gray_img,(int(rx),int(ry)),int(r),(0,0,0),3)            #画圆（表盘）
         img_withpoint = cv2.circle(img_withcircle,(int(rx),int(ry)),1,(255,255,255),3)      #画圆心
@@ -280,7 +321,7 @@ def main(path):
 
 if __name__ == "__main__":
 
-    i=2   
+    i=1   
     path = '%d.jpg' % i
     print(i)
     main(path)
